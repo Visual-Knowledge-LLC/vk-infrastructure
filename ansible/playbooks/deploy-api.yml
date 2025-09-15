@@ -1,0 +1,117 @@
+---
+# Deploy VK API Server Configuration
+- name: Deploy VK API Server
+  hosts: api_server
+  become: yes
+  vars:
+    api_dir: /home/ubuntu/data-uploader
+    log_dir: /var/log/vk-api
+    nginx_dir: /etc/nginx/sites-available
+
+  tasks:
+    - name: Ensure log directory exists
+      file:
+        path: "{{ log_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Deploy systemd service file
+      copy:
+        src: ../../api-server/systemd/vk-api.service
+        dest: /etc/systemd/system/vk-api.service
+        owner: root
+        group: root
+        mode: '0644'
+      notify:
+        - reload systemd
+        - restart api service
+
+    - name: Deploy nginx configuration
+      copy:
+        src: ../../api-server/nginx/vk-api.conf
+        dest: "{{ nginx_dir }}/vk-api"
+        owner: root
+        group: root
+        mode: '0644'
+      notify:
+        - test nginx
+        - reload nginx
+
+    - name: Enable nginx site
+      file:
+        src: "{{ nginx_dir }}/vk-api"
+        dest: /etc/nginx/sites-enabled/vk-api
+        state: link
+      notify:
+        - reload nginx
+
+    - name: Deploy logrotate configuration
+      copy:
+        src: ../../api-server/logs/logrotate.conf
+        dest: /etc/logrotate.d/vk-api
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Deploy monitoring scripts
+      copy:
+        src: "{{ item }}"
+        dest: "{{ api_dir }}/{{ item | basename }}"
+        owner: root
+        group: root
+        mode: '0755'
+      with_fileglob:
+        - ../../api-server/monitoring/*.sh
+
+    - name: Deploy health check module
+      copy:
+        src: ../../api-server/app/health_check.py
+        dest: "{{ api_dir }}/health_check.py"
+        owner: root
+        group: root
+        mode: '0644'
+      when: health_check_file.stat.exists is defined
+
+    - name: Setup cron jobs for monitoring
+      cron:
+        name: "{{ item.name }}"
+        minute: "{{ item.minute }}"
+        job: "{{ item.job }}"
+        user: root
+      loop:
+        - name: "Datadog monitoring"
+          minute: "*"
+          job: "{{ api_dir }}/datadog_monitor.sh >> {{ log_dir }}/datadog.log 2>&1"
+        - name: "CloudWatch monitoring"
+          minute: "*/5"
+          job: "{{ api_dir }}/cloudwatch_monitor.sh >> {{ log_dir }}/cloudwatch.log 2>&1"
+        - name: "Service health check"
+          minute: "*/2"
+          job: "systemctl is-active vk-api || systemctl restart vk-api"
+
+    - name: Start and enable VK API service
+      systemd:
+        name: vk-api
+        state: started
+        enabled: yes
+        daemon_reload: yes
+
+  handlers:
+    - name: reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: restart api service
+      systemd:
+        name: vk-api
+        state: restarted
+
+    - name: test nginx
+      command: nginx -t
+
+    - name: reload nginx
+      systemd:
+        name: nginx
+        state: reloaded

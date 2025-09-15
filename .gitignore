@@ -1,0 +1,49 @@
+# Backup files
+backups/
+*.backup
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+
+# Ansible
+*.retry
+ansible/inventory/hosts
+
+# Environment files
+.env
+*.env.local
+*.env.production
+
+# SSH keys
+*.pem
+*.key
+id_rsa*
+
+# Secrets
+**/secrets/
+**/credentials/
+
+# Logs
+*.log
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+
+# Mac
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
