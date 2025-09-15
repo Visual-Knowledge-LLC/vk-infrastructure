@@ -38,7 +38,7 @@ JSON
 # Check API health and send metrics
 check_api_health() {
     # Get health metrics
-    response=$(curl -s -w "\n%{http_code}" http://localhost:5005/health/metrics)
+    response=$(curl -k -s -w "\n%{http_code}" https://localhost:5005/health/metrics)
     http_code=$(echo "$response" | tail -n1)
     metrics=$(echo "$response" | head -n-1)
 

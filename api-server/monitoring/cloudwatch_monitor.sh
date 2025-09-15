@@ -23,11 +23,11 @@ send_cloudwatch_metric() {
 
 # Check API health
 check_api() {
-    if curl -f -s http://localhost:5005/health > /dev/null 2>&1; then
+    if curl -k -f -s https://localhost:5005/health > /dev/null 2>&1; then
         send_cloudwatch_metric "APIHealth" 1 Count
 
         # Get detailed metrics
-        metrics=$(curl -s http://localhost:5005/health/detailed)
+        metrics=$(curl -k -s https://localhost:5005/health/detailed)
         if [ $? -eq 0 ]; then
             memory_mb=$(echo "$metrics" | jq -r '.metrics.memory_mb // 0')
             cpu_percent=$(echo "$metrics" | jq -r '.metrics.cpu_percent // 0')
