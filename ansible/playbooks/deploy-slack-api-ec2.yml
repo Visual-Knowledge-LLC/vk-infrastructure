@@ -1,0 +1,161 @@
+---
+- name: Deploy VK Slack API to EC2 API Server
+  hosts: localhost
+  gather_facts: no
+  vars:
+    bastion_host: 13.52.186.124
+    api_server: 172.31.0.108
+    api_user: ubuntu
+    service_name: vk-slack-api
+    service_port: 8001
+    nginx_path: /slack
+    local_repo_path: "{{ lookup('env', 'HOME') }}/Dropbox (Personal)/Business/Cowden Operations Inc/Clients/2-Visual Knowledge/projects/vk-slack-api"
+    remote_install_path: /home/ubuntu/vk-slack-api
+
+  tasks:
+    - name: Build Docker image for linux/amd64
+      shell: |
+        cd "{{ local_repo_path }}"
+        docker build --platform linux/amd64 -t vk-slack-api:latest .
+      delegate_to: localhost
+
+    - name: Save Docker image to tar file
+      shell: |
+        docker save vk-slack-api:latest | gzip > /tmp/vk-slack-api.tar.gz
+      delegate_to: localhost
+
+    - name: Copy Docker image to API server via bastion
+      shell: |
+        scp -o ProxyJump={{ api_user }}@{{ bastion_host }} \
+            /tmp/vk-slack-api.tar.gz \
+            {{ api_user }}@{{ api_server }}:/tmp/
+      delegate_to: localhost
+
+    - name: Deploy and configure service on API server
+      shell: |
+        ssh -o ProxyJump={{ api_user }}@{{ bastion_host }} {{ api_user }}@{{ api_server }} << 'EOF'
+        # Load Docker image
+        docker load < /tmp/vk-slack-api.tar.gz
+
+        # Create installation directory
+        sudo mkdir -p {{ remote_install_path }}
+
+        # Create docker-compose.yml
+        sudo tee {{ remote_install_path }}/docker-compose.yml > /dev/null << 'COMPOSE'
+        version: '3.8'
+        services:
+          slack-api:
+            image: vk-slack-api:latest
+            container_name: vk-slack-api
+            restart: always
+            ports:
+              - "{{ service_port }}:8000"
+            environment:
+              - AWS_REGION=us-west-1
+            volumes:
+              - /home/ubuntu/.aws:/root/.aws:ro
+        COMPOSE
+
+        # Stop existing service if running
+        sudo systemctl stop {{ service_name }} || true
+
+        # Create systemd service
+        sudo tee /etc/systemd/system/{{ service_name }}.service > /dev/null << 'SERVICE'
+        [Unit]
+        Description=VK Slack API Service
+        After=docker.service
+        Requires=docker.service
+
+        [Service]
+        Type=simple
+        WorkingDirectory={{ remote_install_path }}
+        ExecStart=/usr/bin/docker-compose up
+        ExecStop=/usr/bin/docker-compose down
+        Restart=always
+        User=ubuntu
+        Group=ubuntu
+        Environment="AWS_PROFILE=default"
+
+        [Install]
+        WantedBy=multi-user.target
+        SERVICE
+
+        # Reload systemd and start service
+        sudo systemctl daemon-reload
+        sudo systemctl enable {{ service_name }}
+        sudo systemctl start {{ service_name }}
+
+        # Wait for service to be ready
+        sleep 5
+
+        # Check service status
+        sudo systemctl status {{ service_name }} --no-pager
+
+        # Update nginx configuration if not already present
+        if ! sudo grep -q "location {{ nginx_path }}/" /etc/nginx/sites-available/default; then
+          # Add to HTTP server block (port 80)
+          sudo sed -i '/server {/,/^}/ {
+            /location \/ {/i\
+            location {{ nginx_path }}/ {\
+                proxy_pass http://localhost:{{ service_port }}/;\
+                proxy_set_header Host $host;\
+                proxy_set_header X-Real-IP $remote_addr;\
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\
+                proxy_set_header X-Forwarded-Proto $scheme;\
+            }\
+            ' /etc/nginx/sites-available/default
+          }
+
+          # Add to HTTPS server block (port 443)
+          sudo sed -i '/listen 443 ssl/,/^}/ {
+            /location \/ {/i\
+            location {{ nginx_path }}/ {\
+                proxy_pass http://localhost:{{ service_port }}/;\
+                proxy_set_header Host $host;\
+                proxy_set_header X-Real-IP $remote_addr;\
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\
+                proxy_set_header X-Forwarded-Proto $scheme;\
+            }\
+            ' /etc/nginx/sites-available/default
+          }
+
+          # Test nginx configuration
+          sudo nginx -t
+
+          # Reload nginx
+          sudo systemctl reload nginx
+        fi
+
+        # Test the deployment
+        curl -X GET http://localhost:{{ service_port }}/health || echo "Health check failed"
+
+        # Cleanup
+        rm -f /tmp/vk-slack-api.tar.gz
+        EOF
+      delegate_to: localhost
+
+    - name: Cleanup local tar file
+      file:
+        path: /tmp/vk-slack-api.tar.gz
+        state: absent
+      delegate_to: localhost
+
+    - name: Verify deployment
+      uri:
+        url: "https://api.visualknowledgeportal.com{{ nginx_path }}/health"
+        method: GET
+        status_code: 200
+      register: health_check
+      ignore_errors: yes
+
+    - name: Display deployment status
+      debug:
+        msg: |
+          Deployment completed!
+          Service: {{ service_name }}
+          Status: {{ 'Running' if health_check.status == 200 else 'Failed' }}
+          URL: https://api.visualknowledgeportal.com{{ nginx_path }}/
+
+          SSH to server: ssh -o ProxyJump={{ api_user }}@{{ bastion_host }} {{ api_user }}@{{ api_server }}
+          Check logs: sudo journalctl -u {{ service_name }} -f
+          Check status: sudo systemctl status {{ service_name }}

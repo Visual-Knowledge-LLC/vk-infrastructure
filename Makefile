@@ -16,6 +16,11 @@ help:
 	@echo "  make logs             - View API logs"
 	@echo "  make status           - Check service status"
 	@echo "  make rollback         - Rollback to previous version"
+	@echo ""
+	@echo "Slack API Deployment:"
+	@echo "  make deploy-slack-api  - Build and deploy Slack API to EC2 API server"
+	@echo "  make slack-api-status  - Check Slack API service status"
+	@echo "  make slack-api-logs    - View Slack API logs"
 
 # Sync configurations from production server
 sync-from-server:
@@ -84,4 +89,28 @@ init:
 	@mkdir -p terraform/{ec2,rds,networking}
 	@mkdir -p ansible/{playbooks,roles}
 	@mkdir -p scripts backups docs
+	@mkdir -p ecs/task-definitions
 	@make install-hooks
+
+# Deploy Slack API to EC2 API Server
+deploy-slack-api:
+	@echo "Deploying Slack API to EC2 API server..."
+	@ansible-playbook ansible/playbooks/deploy-slack-api-ec2.yml
+
+# Check Slack API service status
+slack-api-status:
+	@echo "Checking Slack API service status..."
+	@ssh -o StrictHostKeyChecking=no ec2-user@13.52.186.124 \
+		"ssh ubuntu@172.31.0.108 'sudo systemctl status vk-slack-api --no-pager'"
+
+# View Slack API logs
+slack-api-logs:
+	@echo "Fetching Slack API logs..."
+	@ssh -o StrictHostKeyChecking=no ec2-user@13.52.186.124 \
+		"ssh ubuntu@172.31.0.108 'sudo journalctl -u vk-slack-api -n 50 --no-pager'"
+
+# Restart Slack API service
+restart-slack-api:
+	@echo "Restarting Slack API service..."
+	@ssh -o StrictHostKeyChecking=no ec2-user@13.52.186.124 \
+		"ssh ubuntu@172.31.0.108 'sudo systemctl restart vk-slack-api && sudo systemctl status vk-slack-api --no-pager'"
