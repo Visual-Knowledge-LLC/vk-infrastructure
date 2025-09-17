@@ -7,7 +7,7 @@
     api_server: 172.31.0.108
     api_user: ubuntu
     service_name: vk-slack-api
-    service_port: 8001
+    service_port: 8347
     nginx_path: /slack
     local_repo_path: "{{ lookup('env', 'HOME') }}/Dropbox (Personal)/Business/Cowden Operations Inc/Clients/2-Visual Knowledge/projects/vk-slack-api"
     remote_install_path: /home/ubuntu/vk-slack-api

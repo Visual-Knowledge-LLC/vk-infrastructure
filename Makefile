@@ -109,6 +109,11 @@ slack-api-logs:
 	@ssh -o StrictHostKeyChecking=no ec2-user@13.52.186.124 \
 		"ssh ubuntu@172.31.0.108 'sudo journalctl -u vk-slack-api -n 50 --no-pager'"
 
+# Test Slack API health
+slack-api-health:
+	@echo "Checking Slack API health..."
+	@curl -s https://api.visualknowledgeportal.com/slack/health | jq .
+
 # Restart Slack API service
 restart-slack-api:
 	@echo "Restarting Slack API service..."

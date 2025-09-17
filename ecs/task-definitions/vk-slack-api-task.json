@@ -1,0 +1,95 @@
+{
+  "family": "vk-slack-api-task",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["EC2"],
+  "cpu": "256",
+  "memory": "512",
+  "taskRoleArn": "arn:aws:iam::560463772681:role/ecsTaskRole",
+  "executionRoleArn": "arn:aws:iam::560463772681:role/ecsTaskExecutionRole",
+  "containerDefinitions": [
+    {
+      "name": "vk-slack-api",
+      "image": "560463772681.dkr.ecr.us-west-1.amazonaws.com/vk-slack-api:latest",
+      "cpu": 0,
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "hostPort": 8000,
+          "protocol": "tcp"
+        }
+      ],
+      "essential": true,
+      "environment": [
+        {
+          "name": "PORT",
+          "value": "8000"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "SLACK_BOT_TOKEN",
+          "valueFrom": "arn:aws:secretsmanager:us-west-1:560463772681:secret:vk-slack-api/production-zPU7Fo:SLACK_BOT_TOKEN::"
+        },
+        {
+          "name": "SLACK_CHANNEL_DEFAULT",
+          "valueFrom": "arn:aws:secretsmanager:us-west-1:560463772681:secret:vk-slack-api/production-zPU7Fo:SLACK_CHANNEL_DEFAULT::"
+        },
+        {
+          "name": "SLACK_CHANNEL_ERRORS",
+          "valueFrom": "arn:aws:secretsmanager:us-west-1:560463772681:secret:vk-slack-api/production-zPU7Fo:SLACK_CHANNEL_ERRORS::"
+        },
+        {
+          "name": "SLACK_CHANNEL_BIDS",
+          "valueFrom": "arn:aws:secretsmanager:us-west-1:560463772681:secret:vk-slack-api/production-zPU7Fo:SLACK_CHANNEL_BIDS::"
+        },
+        {
+          "name": "SLACK_CHANNEL_GIT",
+          "valueFrom": "arn:aws:secretsmanager:us-west-1:560463772681:secret:vk-slack-api/production-zPU7Fo:SLACK_CHANNEL_GIT::"
+        },
+        {
+          "name": "SLACK_CHANNEL_NOTIFICATIONS",
+          "valueFrom": "arn:aws:secretsmanager:us-west-1:560463772681:secret:vk-slack-api/production-zPU7Fo:SLACK_CHANNEL_NOTIFICATIONS::"
+        },
+        {
+          "name": "SLACK_WEBHOOK_DEFAULT",
+          "valueFrom": "arn:aws:secretsmanager:us-west-1:560463772681:secret:vk-slack-api/production-zPU7Fo:SLACK_WEBHOOK_DEFAULT::"
+        },
+        {
+          "name": "SLACK_WEBHOOK_ERRORS",
+          "valueFrom": "arn:aws:secretsmanager:us-west-1:560463772681:secret:vk-slack-api/production-zPU7Fo:SLACK_WEBHOOK_ERRORS::"
+        },
+        {
+          "name": "SLACK_WEBHOOK_BIDS",
+          "valueFrom": "arn:aws:secretsmanager:us-west-1:560463772681:secret:vk-slack-api/production-zPU7Fo:SLACK_WEBHOOK_BIDS::"
+        },
+        {
+          "name": "SLACK_WEBHOOK_GIT",
+          "valueFrom": "arn:aws:secretsmanager:us-west-1:560463772681:secret:vk-slack-api/production-zPU7Fo:SLACK_WEBHOOK_GIT::"
+        },
+        {
+          "name": "SLACK_WEBHOOK_NOTIFICATIONS",
+          "valueFrom": "arn:aws:secretsmanager:us-west-1:560463772681:secret:vk-slack-api/production-zPU7Fo:SLACK_WEBHOOK_NOTIFICATIONS::"
+        },
+        {
+          "name": "VK_API_KEYS",
+          "valueFrom": "arn:aws:secretsmanager:us-west-1:560463772681:secret:vk-slack-api/production-zPU7Fo:VK_API_KEYS::"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/vk-slack-api",
+          "awslogs-region": "us-west-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"],
+        "interval": 30,
+        "timeout": 10,
+        "retries": 3,
+        "startPeriod": 60
+      }
+    }
+  ]
+}
