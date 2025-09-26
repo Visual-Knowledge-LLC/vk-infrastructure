@@ -1,0 +1,18 @@
+[Unit]
+Description=VK Data Uploader API
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/data-uploader
+# Environment variables should be stored in a secure .env file on the server
+EnvironmentFile=/home/ubuntu/data-uploader/.env
+ExecStart=/usr/bin/python3 /home/ubuntu/data-uploader/main.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/api_service.log
+StandardError=append:/var/log/api_service_error.log
+
+[Install]
+WantedBy=multi-user.target

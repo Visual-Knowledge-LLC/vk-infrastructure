@@ -24,9 +24,10 @@ copy_to_api() {
         "ssh $API_HOST 'sudo tee $dest > /dev/null'"
 }
 
-# Deploy systemd service
-echo "1️⃣ Deploying systemd service..."
-copy_to_api "$REPO_DIR/api-server/systemd/vk-api.service" "/etc/systemd/system/vk-api.service"
+# Deploy systemd services
+echo "1️⃣ Deploying systemd services..."
+copy_to_api "$REPO_DIR/api-server/systemd/api.service" "/etc/systemd/system/api.service"
+copy_to_api "$REPO_DIR/api-server/systemd/vk-slack-api.service" "/etc/systemd/system/vk-slack-api.service"
 exec_on_api "sudo systemctl daemon-reload"
 
 # Deploy nginx configuration
@@ -60,17 +61,20 @@ if [ -f "$REPO_DIR/api-server/monitoring/cron.d/vk-api-monitoring" ]; then
     copy_to_api "$REPO_DIR/api-server/monitoring/cron.d/vk-api-monitoring" "/etc/cron.d/vk-api-monitoring"
 fi
 
-# Restart service
-echo "7️⃣ Restarting VK API service..."
-exec_on_api "sudo systemctl restart vk-api"
+# Restart services
+echo "7️⃣ Restarting API services..."
+exec_on_api "sudo systemctl restart api"
+exec_on_api "sudo systemctl restart vk-slack-api"
 sleep 5
 
 # Check status
 echo "8️⃣ Checking service status..."
-exec_on_api "sudo systemctl status vk-api --no-pager"
+exec_on_api "sudo systemctl status api --no-pager"
+exec_on_api "sudo systemctl status vk-slack-api --no-pager"
 
 # Health check
-echo "9️⃣ Running health check..."
-exec_on_api "curl -s http://localhost:5005/health | jq '.'"
+echo "9️⃣ Running health checks..."
+exec_on_api "curl -k -s https://localhost:5005/health | jq '.'"
+exec_on_api "curl -s http://localhost:8347/health | jq '.'"
 
 echo "✅ Deployment complete!"
