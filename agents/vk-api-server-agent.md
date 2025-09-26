@@ -14,22 +14,33 @@ This specialized agent manages the Visual Knowledge API Server (172.31.0.108) th
 ## Core Capabilities
 
 ### 1. Service Management
+
+**IMPORTANT**: Always use systemctl to manage services. Never kill processes manually as systemd will auto-restart them.
+
 ```bash
 # Check service status
 sudo systemctl status api
 sudo systemctl status vk-slack-api
 
-# Start/Stop/Restart services
+# Start/Stop/Restart services (PREFERRED METHOD)
+sudo systemctl restart api           # This is the CORRECT way
+sudo systemctl restart vk-slack-api
+
+# Stop service completely
+sudo systemctl stop api             # Stops and prevents auto-restart
+
+# Start service
 sudo systemctl start api
-sudo systemctl stop api
-sudo systemctl restart api
 
 # Enable/Disable services
-sudo systemctl enable api
-sudo systemctl disable api
+sudo systemctl enable api           # Start on boot
+sudo systemctl disable api          # Don't start on boot
 
 # Reload systemd after config changes
 sudo systemctl daemon-reload
+
+# Reset failed state if needed
+sudo systemctl reset-failed api
 ```
 
 ### 2. Log Analysis
@@ -76,17 +87,29 @@ python3 -c "import db_connect; engine = db_connect.PGconnection(); print('Connec
 
 #### Service Won't Start
 ```bash
-# Check for port conflicts
-sudo lsof -i :5005
-sudo kill -9 <PID>  # If needed
+# NEVER manually kill processes - use systemctl instead!
+# If service is failing to start:
 
-# Check Python syntax
+# 1. Check the actual error
+sudo journalctl -u api -n 50 --no-pager
+
+# 2. Test Python directly with environment
 cd /home/ubuntu/data-uploader
+source set_env.sh  # Load environment variables
+python3 main.py    # See the actual error
+
+# 3. If port conflict (Address already in use):
+sudo lsof -i :5005
+# DO NOT kill -9! Instead:
+sudo systemctl stop api
+sudo systemctl reset-failed api
+sudo systemctl start api
+
+# 4. Check Python syntax
 python3 -m py_compile main.py
 
-# Run manually for debugging
-source set_env.sh
-python3 main.py
+# 5. Verify environment variables are loaded
+sudo systemctl show api | grep Environment
 ```
 
 #### High Memory/CPU Usage
@@ -205,12 +228,25 @@ sudo systemctl status vk-slack-api
 curl -k https://localhost:5005/health
 ```
 
-### Manual Service Recovery
+### Manual Service Recovery (Emergency Only)
 ```bash
+# ONLY use this if systemd is completely broken
+# First, always try: sudo systemctl restart api
+
+# If systemd fails, disable it temporarily:
+sudo systemctl stop api
+sudo systemctl disable api
+
+# Run manually with proper environment:
 cd /home/ubuntu/data-uploader
 source set_env.sh
 nohup python3 main.py > /tmp/api_manual.log 2>&1 &
 tail -f /tmp/api_manual.log
+
+# To restore systemd management:
+pkill -f "data-uploader/main.py"
+sudo systemctl enable api
+sudo systemctl start api
 ```
 
 ## Related Documentation
