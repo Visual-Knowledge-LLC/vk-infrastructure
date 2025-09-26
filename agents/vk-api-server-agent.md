@@ -58,9 +58,17 @@ sudo journalctl -u api --since "2025-09-26 19:00" --until "2025-09-26 20:00"
 ```
 
 ### 3. Health Checks
+
+**CRITICAL**: The Data Uploader API uses HTTPS, not HTTP!
+
 ```bash
-# API health endpoints
+# CORRECT - Data Uploader API (MUST use HTTPS with -k flag)
 curl -k https://localhost:5005/health
+
+# WRONG - This will ALWAYS fail with "Connection reset"
+curl http://localhost:5005/health  # DO NOT USE!
+
+# Slack API uses regular HTTP
 curl http://localhost:8347/health
 
 # Check listening ports
@@ -173,17 +181,21 @@ for i in {1..10}; do curl -k https://localhost:5005/health & done; wait
 When using the `mcp__vk-operations__execute_on_api_server_tool`:
 
 ```python
+# CORRECT - Restart service (ALWAYS use this)
+execute_on_api_server_tool(command="sudo systemctl restart api")
+
+# WRONG - Never do this (causes auto-restart loops)
+execute_on_api_server_tool(command="kill -9 <PID>")  # DO NOT USE!
+
 # Check service status
 execute_on_api_server_tool(command="sudo systemctl status api --no-pager")
 
 # View recent logs
 execute_on_api_server_tool(command="tail -50 /var/log/api_service.log")
 
-# Restart service
-execute_on_api_server_tool(command="sudo systemctl restart api")
-
-# Health check
+# Health check - MUST use HTTPS
 execute_on_api_server_tool(command="curl -k https://localhost:5005/health")
+# NOT: curl http://localhost:5005/health  # This will fail!
 ```
 
 ## Important Notes
@@ -198,11 +210,12 @@ execute_on_api_server_tool(command="curl -k https://localhost:5005/health")
 
 | Issue | Solution |
 |-------|----------|
-| API returns "Connection reset by peer" | Service is down or crashing. Check logs and restart |
-| "Address already in use" | Kill existing process on port before starting |
-| Database connection fails | Check environment variables and network connectivity |
-| SSL/TLS errors | Verify certificates and use `-k` flag with curl for testing |
-| Service won't stay running | Check logs for startup errors, verify database connectivity |
+| API returns "Connection reset by peer" | **You're using HTTP instead of HTTPS!** Use `curl -k https://localhost:5005/health` |
+| curl fails with exit code 56 | **Use HTTPS not HTTP!** The API requires SSL/TLS |
+| Service keeps restarting | **STOP using kill -9!** Use `sudo systemctl restart api` instead |
+| "Address already in use" | Use `sudo systemctl stop api` then `sudo systemctl start api` |
+| Database connection fails | Check environment variables with `sudo systemctl show api \| grep Environment` |
+| Service won't stay running | Check logs: `sudo journalctl -u api -n 50` |
 
 ## Emergency Procedures
 
