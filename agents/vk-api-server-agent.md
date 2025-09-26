@@ -61,13 +61,49 @@ sudo journalctl -u api --since "2025-09-26 19:00" --until "2025-09-26 20:00"
 
 **CRITICAL**: The Data Uploader API uses HTTPS, not HTTP!
 
+#### Basic Health Check
 ```bash
 # CORRECT - Data Uploader API (MUST use HTTPS with -k flag)
 curl -k https://localhost:5005/health
 
 # WRONG - This will ALWAYS fail with "Connection reset"
 curl http://localhost:5005/health  # DO NOT USE!
+```
 
+#### Detailed Health Check (Comprehensive Metrics)
+```bash
+# Get detailed metrics including CPU, memory, disk, and process info
+curl -k https://localhost:5005/health/detailed
+
+# From external:
+curl -k https://api.visualknowledgeportal.com:5005/health/detailed
+```
+
+**Detailed Health Response includes:**
+- **CPU**: Current CPU usage percentage
+- **Memory**: Available RAM, usage percentage, total RAM
+- **Disk**: Free space in GB, usage percentage
+- **Process**: API process memory usage, uptime in seconds
+- **Service**: Service name and health status
+- **Timestamp**: Current server time
+
+Example response:
+```json
+{
+  "metrics": {
+    "cpu_percent": 64.6,
+    "disk": {"free_gb": 7.6, "percent": 46.9},
+    "memory": {"available_mb": 1246.7, "percent": 35.4, "total_mb": 1930.2},
+    "process": {"memory_mb": 118.2, "uptime_seconds": 157.4}
+  },
+  "service": "vk-api",
+  "status": "healthy",
+  "timestamp": "2025-09-26T22:20:12.521064"
+}
+```
+
+#### Other Health Checks
+```bash
 # Slack API uses regular HTTP
 curl http://localhost:8347/health
 
@@ -165,6 +201,9 @@ sudo journalctl -u api -f
 
 # Monitor connections
 watch -n 10 'sudo netstat -an | grep :5005 | wc -l'
+
+# Monitor detailed metrics (CPU, memory, disk)
+watch -n 10 'curl -k -s https://localhost:5005/health/detailed | jq .'
 ```
 
 #### Performance Metrics
@@ -172,9 +211,25 @@ watch -n 10 'sudo netstat -an | grep :5005 | wc -l'
 # Response time test
 time curl -k https://localhost:5005/health
 
+# Detailed metrics with response time
+time curl -k https://localhost:5005/health/detailed
+
 # Load test (be careful in production)
 for i in {1..10}; do curl -k https://localhost:5005/health & done; wait
+
+# Check resource usage trends
+for i in {1..5}; do
+  curl -k -s https://localhost:5005/health/detailed | jq '.metrics'
+  sleep 5
+done
 ```
+
+#### Health Monitoring Thresholds
+- **CPU**: Warning > 80%, Critical > 95%
+- **Memory**: Warning > 80%, Critical > 90%
+- **Disk**: Warning > 80%, Critical > 90%
+- **Process Memory**: Warning > 500MB, Critical > 1GB
+- **Uptime**: Alert if < 300 seconds (recent restart)
 
 ## MCP Tool Usage
 
@@ -193,8 +248,12 @@ execute_on_api_server_tool(command="sudo systemctl status api --no-pager")
 # View recent logs
 execute_on_api_server_tool(command="tail -50 /var/log/api_service.log")
 
-# Health check - MUST use HTTPS
+# Basic health check - MUST use HTTPS
 execute_on_api_server_tool(command="curl -k https://localhost:5005/health")
+
+# Detailed health check with metrics
+execute_on_api_server_tool(command="curl -k -s https://localhost:5005/health/detailed | jq '.'")
+
 # NOT: curl http://localhost:5005/health  # This will fail!
 ```
 

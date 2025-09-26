@@ -84,11 +84,17 @@ mcp__vk-operations__execute_on_api_server_tool(command="sudo systemctl restart a
 
 ### Health Check
 ```bash
-# Using MCP tool
+# Basic health check (using MCP tool)
 mcp__vk-operations__execute_on_api_server_tool(command="curl -k https://localhost:5005/health")
 
-# Using SSH directly
+# Detailed health check with metrics (using MCP tool)
+mcp__vk-operations__execute_on_api_server_tool(command="curl -k -s https://localhost:5005/health/detailed | jq '.'")
+
+# Using SSH directly - Basic
 curl -k https://api.visualknowledgeportal.com:5005/health
+
+# Using SSH directly - Detailed (includes CPU, memory, disk metrics)
+curl -k https://api.visualknowledgeportal.com:5005/health/detailed
 ```
 
 ## Related Resources
