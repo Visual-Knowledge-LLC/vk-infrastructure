@@ -1,0 +1,2 @@
+# Keep this directory but warn about sensitive files
+# .env.production contains sensitive credentials - handle with care!
